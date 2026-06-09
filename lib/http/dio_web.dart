@@ -11,6 +11,7 @@ import 'package:flutter_v2ex/utils/event_bus.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_v2ex/http/init.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart';
 import 'package:flutter_v2ex/package/xpath/xpath.dart';
 import 'package:flutter_v2ex/models/web/item_tab_topic.dart'; // 首页tab主题列表
@@ -162,6 +163,63 @@ class DioRequestWeb {
     return res;
   }
 
+  static List<TabTopicItem> _parsePcTopicItems(dom.Document document) {
+    var topicList = <TabTopicItem>[];
+    var topicNodes = document.querySelectorAll('div.cell.item');
+    for (var aNode in topicNodes) {
+      var titleInfo = aNode.querySelector('span.item_title > a');
+      if (titleInfo == null) continue;
+
+      var item = TabTopicItem();
+      item.topicTitle = titleInfo.text.trim();
+
+      var topicUrl = titleInfo.attributes['href'] ?? '';
+      var topicIdMatch = RegExp(r'/t/(\d+)').firstMatch(topicUrl);
+      if (topicIdMatch == null) continue;
+      item.topicId = topicIdMatch.group(1)!;
+
+      var avatarSrc = aNode.querySelector('img.avatar')?.attributes['src'] ??
+          aNode.querySelector('img')?.attributes['src'];
+      if (avatarSrc != null) {
+        item.avatar = Uri.encodeFull(avatarSrc);
+      }
+
+      var countText = aNode.querySelector('a.count_livid')?.text.trim();
+      if (countText != null && countText.isNotEmpty) {
+        item.replyCount = int.tryParse(countText) ?? 0;
+      }
+
+      var topicInfo = aNode.querySelector('span.topic_info');
+      if (topicInfo != null) {
+        item.lastReplyTime = topicInfo.querySelector('span')?.text.trim() ?? '';
+
+        var nodeEl = topicInfo.querySelector('a.node');
+        if (nodeEl != null) {
+          item.nodeName = nodeEl.text.trim();
+          item.nodeId =
+              nodeEl.attributes['href']?.replaceFirst('/go/', '') ?? '';
+        }
+
+        var memberEls = topicInfo
+            .querySelectorAll('a')
+            .where(
+                (el) => el.attributes['href']?.startsWith('/member/') ?? false)
+            .toList();
+        if (memberEls.isNotEmpty) {
+          item.memberId =
+              memberEls[0].attributes['href']!.replaceFirst('/member/', '');
+        }
+        if (memberEls.length >= 2) {
+          item.lastReplyMId =
+              memberEls[1].attributes['href']!.replaceFirst('/member/', '');
+        }
+      }
+
+      topicList.add(item);
+    }
+    return topicList;
+  }
+
   // 获取最新的主题
   static Future getTopicsRecent(String path, int p) async {
     var res = {};
@@ -179,63 +237,24 @@ class DioRequestWeb {
     } catch (err) {
       rethrow;
     }
-    var tree = ETree.fromString(response.data);
-    var aRootNode = tree.xpath("//*[@class='cell item']");
-    for (var aNode in aRootNode!) {
-      var item = TabTopicItem();
-      item.memberId =
-          aNode.xpath("/table/tr/td[3]/span[2]/strong/a/text()")![0].name!;
-      if (aNode.xpath("/table/tr/td[1]/a[1]/img") != null &&
-          aNode.xpath("/table/tr/td[1]/a[1]/img")!.isNotEmpty) {
-        item.avatar = Uri.encodeFull(aNode
-            .xpath("/table/tr/td[1]/a[1]/img[@class='avatar']")
-            ?.first
-            .attributes["src"]);
-      }
-      String topicUrl = aNode
-          .xpath("/table/tr/td[3]/span[1]/a")
-          ?.first
-          .attributes["href"]; // 得到是 /t/522540#reply17
-      item.topicId = topicUrl.replaceAll("/t/", "").split("#")[0];
-      if (aNode.xpath("/table/tr/td[4]")!.first.children.isNotEmpty) {
-        item.replyCount =
-            int.parse(aNode.xpath("/table/tr/td[4]/a/text()")![0].name!);
-      }
-      item.lastReplyTime =
-          aNode.xpath("/table/tr/td[3]/span[2]/span/text()")![0].name!;
-      item.nodeName = aNode.xpath("/table/tr/td[3]/span[2]/a/text()")![0].name!;
-
-      item.topicTitle = aNode
-          .xpath("/table/tr/td[3]/span[1]/a/text()")![0]
-          .name!
-          .replaceAll('&quot;', '"')
-          .replaceAll('&amp;', '&')
-          .replaceAll('&lt;', '<')
-          .replaceAll('&gt;', '>');
-      item.nodeId = aNode
-          .xpath("/table/tr/td[3]/span[2]/a")
-          ?.first
-          .attributes["href"]
-          .split('/')[2];
-      topicList.add(item);
-    }
+    var document = parse(response.data);
+    topicList = _parsePcTopicItems(document);
     try {
       Read().mark(topicList);
     } catch (err) {
       logDebug(err);
     }
-    var document = parse(response.data);
     var rightBarNode = document.querySelector('#Rightbar > div.box');
-    List tableList = rightBarNode!.querySelectorAll('table');
-    if (tableList.isNotEmpty) {
-      var actionNodes = tableList[1]!.querySelectorAll('span.bigger');
+    List tableList = rightBarNode?.querySelectorAll('table') ?? [];
+    if (tableList.length >= 2) {
+      var actionNodes = tableList[1].querySelectorAll('span.bigger');
       for (var i in actionNodes) {
         actionCounts.add(int.parse(i.text ?? 0));
       }
-      if (rightBarNode.querySelector('#money') != null) {
-        balance = rightBarNode.querySelector('#money >a')!.innerHtml;
+      if (rightBarNode?.querySelector('#money') != null) {
+        balance = rightBarNode?.querySelector('#money >a')?.innerHtml ?? '';
       }
-      var noticeEl = rightBarNode.querySelectorAll('a.fade');
+      var noticeEl = rightBarNode?.querySelectorAll('a.fade') ?? [];
       if (noticeEl.isNotEmpty) {
         var unRead = noticeEl[0].text.replaceAll(RegExp(r'\D'), '');
         // logDebug('$unRead条未读消息');
