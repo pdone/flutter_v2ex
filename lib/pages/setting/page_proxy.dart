@@ -86,34 +86,47 @@ class _SetProxyPageState extends State<SetProxyPage> {
 
     try {
       final stopwatch = Stopwatch()..start();
-      final uri = Uri.parse('https://www.v2ex.com');
+      final testConfig = ProxyConfig(
+        enable: true,
+        type: proxyType,
+        host: host,
+        port: port,
+        username: _usernameController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-      if (proxyType == 'http') {
-        final client = HttpClient();
-        client.findProxy = (uri) {
-          return 'PROXY $host:$port;';
-        };
-        client.badCertificateCallback = (cert, host, port) => true;
-        final request = await client.getUrl(uri).timeout(
-              const Duration(seconds: 10),
-            );
-        final response = await request.close().timeout(
-              const Duration(seconds: 10),
-            );
-        stopwatch.stop();
-        if (response.statusCode == 200 || response.statusCode == 302) {
-          SmartDialog.showToast(
-            '连接成功 ⏱ ${stopwatch.elapsedMilliseconds}ms',
-          );
-        } else {
-          SmartDialog.showToast('连接失败，状态码: ${response.statusCode}');
-        }
-        client.close();
+      final testDio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+
+      if (proxyType == 'socks5') {
+        testDio.httpClientAdapter = Socks5HttpClientAdapter(testConfig);
       } else {
-        SmartDialog.showToast('SOCKS5 测试请保存后直接使用');
+        final adapter = HttpClientAdapter();
+        testDio.httpClientAdapter = adapter;
+        HttpOverrides.global = _TestProxyHttpOverrides(testConfig);
       }
+
+      final response = await testDio.get(
+        'https://www.v2ex.com/',
+        options: Options(
+          validateStatus: (status) =>
+              status != null && (status == 200 || status == 302),
+        ),
+      ).timeout(const Duration(seconds: 20));
+
+      stopwatch.stop();
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        SmartDialog.showToast('连接成功 ⏱ ${stopwatch.elapsedMilliseconds}ms');
+      } else {
+        SmartDialog.showToast('连接失败，状态码: ${response.statusCode}');
+      }
+      testDio.close();
     } catch (e) {
-      SmartDialog.showToast('连接失败: ${e.toString().substring(0, e.toString().length > 50 ? 50 : e.toString().length)}');
+      final msg = e.toString();
+      SmartDialog.showToast(
+          '连接失败: ${msg.substring(0, msg.length > 60 ? 60 : msg.length)}');
     } finally {
       SmartDialog.dismiss();
     }
