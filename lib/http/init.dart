@@ -95,11 +95,14 @@ class Request {
   static void _setupDioProxy() {
     if (!CustomProxy.currentConfig.isValid) {
       dio.httpClientAdapter = HttpClientAdapter();
+      HttpOverrides.global = null;
       return;
     }
 
     if (CustomProxy.currentConfig.type == 'socks5') {
       dio.httpClientAdapter = CustomProxy.createDioAdapter();
+      // SOCKS5 通过自定义 adapter 处理，不依赖 HttpOverrides
+      HttpOverrides.global = null;
       return;
     }
 

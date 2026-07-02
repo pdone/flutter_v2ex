@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_v2ex/utils/proxy.dart';
@@ -86,43 +87,69 @@ class _SetProxyPageState extends State<SetProxyPage> {
 
     try {
       final stopwatch = Stopwatch()..start();
-      final testConfig = ProxyConfig(
-        enable: true,
-        type: proxyType,
-        host: host,
-        port: port,
-        username: _usernameController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      final testDio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
-      ));
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text.trim();
+      final uri = Uri.parse('https://www.v2ex.com/');
 
       if (proxyType == 'socks5') {
+        // SOCKS5: use the custom adapter through Dio.
+        final testConfig = ProxyConfig(
+          enable: true,
+          type: 'socks5',
+          host: host,
+          port: port,
+          username: username,
+          password: password,
+        );
+        final testDio = Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
+        ));
         testDio.httpClientAdapter = Socks5HttpClientAdapter(testConfig);
-      } else {
-        final adapter = HttpClientAdapter();
-        testDio.httpClientAdapter = adapter;
-        HttpOverrides.global = _TestProxyHttpOverrides(testConfig);
-      }
 
-      final response = await testDio.get(
-        'https://www.v2ex.com/',
-        options: Options(
-          validateStatus: (status) =>
-              status != null && (status == 200 || status == 302),
-        ),
-      ).timeout(const Duration(seconds: 20));
+        final response = await testDio.get(
+          uri.toString(),
+          options: Options(
+            validateStatus: (status) =>
+                status != null && (status == 200 || status == 302),
+          ),
+        ).timeout(const Duration(seconds: 20));
 
-      stopwatch.stop();
-      if (response.statusCode == 200 || response.statusCode == 302) {
-        SmartDialog.showToast('连接成功 ⏱ ${stopwatch.elapsedMilliseconds}ms');
+        stopwatch.stop();
+        if (response.statusCode == 200 || response.statusCode == 302) {
+          SmartDialog.showToast('连接成功 ⏱ ${stopwatch.elapsedMilliseconds}ms');
+        } else {
+          SmartDialog.showToast('连接失败，状态码: ${response.statusCode}');
+        }
+        testDio.close();
       } else {
-        SmartDialog.showToast('连接失败，状态码: ${response.statusCode}');
+        // HTTP proxy: use HttpClient with findProxy (no global side effects).
+        final client = HttpClient();
+        client.findProxy = (uri) => 'PROXY $host:$port;';
+        if (username.isNotEmpty && password.isNotEmpty) {
+          client.addCredentials(
+            Uri.parse('http://$host:$port'),
+            '',
+            HttpClientBasicCredentials(username, password),
+          );
+        }
+        client.badCertificateCallback = (cert, h, p) => true;
+        final request = await client.getUrl(uri).timeout(
+              const Duration(seconds: 10),
+            );
+        final response = await request.close().timeout(
+              const Duration(seconds: 15),
+            );
+        stopwatch.stop();
+        if (response.statusCode == 200 || response.statusCode == 302) {
+          SmartDialog.showToast('连接成功 ⏱ ${stopwatch.elapsedMilliseconds}ms');
+        } else {
+          SmartDialog.showToast('连接失败，状态码: ${response.statusCode}');
+        }
+        // Drain and close.
+        await response.drain<void>();
+        client.close();
       }
-      testDio.close();
     } catch (e) {
       final msg = e.toString();
       SmartDialog.showToast(

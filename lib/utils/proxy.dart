@@ -306,11 +306,14 @@ class Socks5HttpClientAdapter implements HttpClientAdapter {
       // Read HTTP response.
       return await _readHttpResponse(reader!, cancelFuture);
     } catch (e) {
-      reader?.destroy();
-      if (!identical(activeSocket, rawSocket)) {
+      // reader.destroy() closes its socket (and the underlying raw socket
+      // when it is a SecureSocket). When reader is null (SecureSocket.secure
+      // threw), we need to close rawSocket explicitly.
+      if (reader != null) {
+        reader!.destroy();
+      } else {
         rawSocket.destroy();
       }
-      activeSocket.destroy();
       rethrow;
     }
   }
@@ -487,13 +490,8 @@ class Socks5HttpClientAdapter implements HttpClientAdapter {
     _SocketReader reader,
     Future<void>? cancelFuture,
   ) async {
-    final cancelCompleter = Completer<void>();
-    cancelFuture?.whenComplete(() {
-      if (!cancelCompleter.isCompleted) {
-        cancelCompleter.complete();
-      }
-      reader.destroy();
-    });
+    // Destroy the reader if the request is cancelled mid-read.
+    cancelFuture?.whenComplete(reader.destroy);
 
     // Read header block until CRLFCRLF.
     final headerBytes = await reader
@@ -542,6 +540,9 @@ class Socks5HttpClientAdapter implements HttpClientAdapter {
       body = (await reader.readUntilClose()).toList();
     }
 
+    // Socket no longer needed after the full response has been buffered.
+    reader.destroy();
+
     // Apply Content-Encoding decompression so Dio sees plain bytes.
     if (contentEncoding != null) {
       if (contentEncoding.contains('gzip') || contentEncoding.contains('x-gzip')) {
@@ -579,8 +580,11 @@ class Socks5HttpClientAdapter implements HttpClientAdapter {
           int.parse(sizeStr.split(';').first.trim(), radix: 16);
 
       if (chunkSize == 0) {
-        // Trailer section ends with CRLF (empty) or trailer headers + CRLF.
-        await reader.readUntil([13, 10]);
+        // Drain the trailer section: read lines until an empty line (CRLF).
+        while (true) {
+          final trailerLine = await reader.readUntil([13, 10]);
+          if (trailerLine.length == 2) break; // Just CRLF = end of trailers
+        }
         break;
       }
 
