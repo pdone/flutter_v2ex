@@ -49,14 +49,14 @@ class Global {
     } catch (err) {
       logDebug('LocalNoticeService err: ${err.toString()}');
     }
-    // 配置代理
-    CustomProxy().init();
     // 本地存储初始化
     try {
       await GetStorage.init();
     } catch (err) {
       logDebug('GetStorage err: ${err.toString()}');
     }
+    // 配置代理（需要在GetStorage初始化之后）
+    await CustomProxy.init();
     // Hive初始化 历史浏览box
     await initHive();
     // Dio 初始化

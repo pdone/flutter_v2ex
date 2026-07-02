@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_v2ex/utils/string.dart';
+import 'package:flutter_v2ex/http/init.dart';
 
 class NetworkCheckPage extends StatefulWidget {
   const NetworkCheckPage({Key? key}) : super(key: key);
@@ -22,7 +23,7 @@ class _NetworkCheckPageState extends State<NetworkCheckPage> {
 
   init() async {
     try {
-      final res = await Dio().get('${Strings.v2exHost}/');
+      final res = await Request.dio.get('${Strings.v2exHost}/');
       response = res.data.toString();
     } on DioException catch (e) {
       response = e.toString();

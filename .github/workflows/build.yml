@@ -16,6 +16,8 @@ jobs:
     build_apk:
         # 运行环境 ubuntu-latest window-latest mac-latest
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
 
         # 每个jobs中可以有多个steps
         steps:
@@ -71,6 +73,6 @@ jobs:
             - name: 发布
               uses: ncipollo/release-action@v1
               with:
-                  artifacts: "build/app/outputs/flutter-apk/vvex-*.apk"
-                  token: ${{ secrets.GIT_TOKEN }}
+                  artifacts: "build/app/outputs/flutter-apk/app-*.apk"
+                  token: ${{ secrets.GITHUB_TOKEN }}
                   allowUpdates: true

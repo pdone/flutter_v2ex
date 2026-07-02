@@ -13,6 +13,7 @@ import 'package:flutter_v2ex/http/interceptor.dart';
 // import 'package:dio_http_cache/dio_http_cache.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter_v2ex/utils/logger.dart';
+import 'package:flutter_v2ex/utils/proxy.dart';
 
 class Request {
   static final Request _instance = Request._internal();
@@ -57,7 +58,7 @@ class Request {
       baseUrl: Strings.v2exHost,
       //连接服务器超时时间，单位是毫秒.
       connectTimeout: const Duration(milliseconds: 12000),
-      //响应流上前后两次接受到数据的间隔，单位为毫秒。
+      //响应流上前后两次接受到数据的间隔，单位是毫秒。
       receiveTimeout: const Duration(milliseconds: 12000),
       //Http请求头.
       // headers: {
@@ -71,6 +72,8 @@ class Request {
 
     dio = Dio(options);
 
+    _setupDioProxy();
+
     setCookie();
     //添加拦截器
     dio.interceptors
@@ -83,26 +86,26 @@ class Request {
         responseHeader: false,
       ));
     // (dio.transformer as DefaultTransformer).jsonDecodeCallback = parseJson;
-    // (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate =
-    //     (HttpClient client) {
-    //   // config the http client
-    //   client.findProxy = (uri) {
-    //     // proxy all request to localhost:8888
-    //     // return 'PROXY localhost:7890';
-    //     // return 'PROXY 127.0.0.1:7890';
-    //     // 不设置代理 TODO 打包前关闭代理
-    //     return 'DIRECT';
-    //   };
-    // client.badCertificateCallback =
-    //     (X509Certificate cert, String host, int port) => true;
-    // return null;
-    // you can also create a HttpClient to dio
-    //   return client;
-    // };
 
     dio.options.validateStatus = (status) {
       return status! >= 200 && status < 300 || status == 304 || status == 302;
     };
+  }
+
+  static void _setupDioProxy() {
+    if (!CustomProxy.currentConfig.isValid) {
+      dio.httpClientAdapter = HttpClientAdapter();
+      HttpOverrides.global = null;
+      return;
+    }
+
+    // HTTP 代理：通过 HttpOverrides 全局设置
+    dio.httpClientAdapter = HttpClientAdapter();
+    HttpOverrides.global = _ProxyHttpOverrides();
+  }
+
+  static void updateProxy() {
+    _setupDioProxy();
   }
 
   /*
@@ -137,7 +140,7 @@ class Request {
       return response;
     } on DioException catch (e) {
       logDebug('get error---------$e');
-      return Future.error(ApiInterceptor.dioError(e));
+      return Future.error(await ApiInterceptor.dioError(e));
     }
   }
 
@@ -158,7 +161,7 @@ class Request {
       return response;
     } on DioException catch (e) {
       logDebug('post error---------$e');
-      return Future.error(ApiInterceptor.dioError(e));
+      return Future.error(await ApiInterceptor.dioError(e));
     }
   }
 
@@ -178,7 +181,7 @@ class Request {
       return response.data;
     } on DioException catch (e) {
       logDebug('downloadFile error---------$e');
-      return Future.error(ApiInterceptor.dioError(e));
+      return Future.error(await ApiInterceptor.dioError(e));
     }
   }
 
@@ -206,5 +209,14 @@ class Request {
           'Mozilla/5.0 (MaciMozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36';
     }
     return headerUa;
+  }
+}
+
+class _ProxyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final client = super.createHttpClient(context);
+    CustomProxy.setupHttpClient(client);
+    return client;
   }
 }

@@ -109,6 +109,15 @@ class _SettingPageState extends State<SettingPage> {
             subtitle: Text('调整节点顺序', style: subTitleStyle),
           ),
           ListTile(
+            onTap: () => Get.toNamed('/setProxy'),
+            title: const Text('代理设置'),
+            subtitle: Text('配置 HTTP 代理', style: subTitleStyle),
+            trailing: Text(
+              GStorage().getProxyEnable() ? '已开启' : '已关闭',
+              style: subTitleStyle,
+            ),
+          ),
+          ListTile(
             enableFeedback: true,
             onTap: () {
               setState(() {
