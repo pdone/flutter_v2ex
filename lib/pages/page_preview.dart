@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_v2ex/utils/utils.dart';
+import 'package:flutter_v2ex/http/init.dart' as http_init;
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:extended_image/extended_image.dart';
@@ -93,7 +94,7 @@ class _ImagePreviewState extends State<ImagePreview>
 
   void onSaveImg() async {
     SmartDialog.showLoading(msg: '保存中');
-    var response = await Dio().get(imgList[initialPage],
+    var response = await http_init.Request.dio.get(imgList[initialPage],
         options: Options(responseType: ResponseType.bytes));
     final result = await SaverGallery.saveImage(
       Uint8List.fromList(response.data),
@@ -110,7 +111,7 @@ class _ImagePreviewState extends State<ImagePreview>
   void onShareImg() async {
     _requestPermission();
     // final Uri imgUrl = Uri.parse(imgList[initialPage]) ;
-    var response = await Dio().get(imgList[initialPage],
+    var response = await http_init.Request.dio.get(imgList[initialPage],
         options: Options(responseType: ResponseType.bytes));
 
     final temp = await getTemporaryDirectory();

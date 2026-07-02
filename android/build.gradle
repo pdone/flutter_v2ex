@@ -1,33 +1,33 @@
 buildscript {
-    ext.kotlin_version = '2.1.20'
+    ext.kotlin_version = '1.9.24'
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
     }
-
-    configurations.all {
-        resolutionStrategy {
-            force 'androidx.core:core-ktx:1.15.0'
-        }
-    }
-
 
     dependencies {
         classpath 'com.android.tools.build:gradle:8.3.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
-
-//    android {
-//        defaultConfig {
-//            multiDexEnabled true
-//        }
-//    }
 }
 
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+    }
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.core:core-ktx:1.15.0'
+            force 'androidx.core:core:1.15.0'
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24'
+        }
     }
 }
 

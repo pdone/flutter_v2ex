@@ -29,7 +29,13 @@ enum StoreKeys {
   tempFs,
   sideslip,
   dragOffset,
-  displayModeType
+  displayModeType,
+  proxyEnable,
+  proxyType,
+  proxyHost,
+  proxyPort,
+  proxyUsername,
+  proxyPassword
 }
 
 class GStorage {
@@ -207,5 +213,47 @@ class GStorage {
     }
     return f;
   }
+
+  // 代理开关
+  setProxyEnable(bool value) =>
+      _box.write(StoreKeys.proxyEnable.toString(), value);
+
+  bool getProxyEnable() =>
+      _box.read<bool>(StoreKeys.proxyEnable.toString()) ?? false;
+
+  // 代理类型 http / socks5
+  setProxyType(String value) =>
+      _box.write(StoreKeys.proxyType.toString(), value);
+
+  String getProxyType() =>
+      _box.read<String>(StoreKeys.proxyType.toString()) ?? 'http';
+
+  // 代理地址
+  setProxyHost(String value) =>
+      _box.write(StoreKeys.proxyHost.toString(), value);
+
+  String getProxyHost() =>
+      _box.read<String>(StoreKeys.proxyHost.toString()) ?? '';
+
+  // 代理端口
+  setProxyPort(String value) =>
+      _box.write(StoreKeys.proxyPort.toString(), value);
+
+  String getProxyPort() =>
+      _box.read<String>(StoreKeys.proxyPort.toString()) ?? '';
+
+  // 代理用户名
+  setProxyUsername(String value) =>
+      _box.write(StoreKeys.proxyUsername.toString(), value);
+
+  String getProxyUsername() =>
+      _box.read<String>(StoreKeys.proxyUsername.toString()) ?? '';
+
+  // 代理密码
+  setProxyPassword(String value) =>
+      _box.write(StoreKeys.proxyPassword.toString(), value);
+
+  String getProxyPassword() =>
+      _box.read<String>(StoreKeys.proxyPassword.toString()) ?? '';
 
 }
